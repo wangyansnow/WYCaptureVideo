@@ -117,6 +117,8 @@ typedef void(^PropertyChangeBlock)(AVCaptureDevice *captureDevice);
     }
     // 3.添加一个音频输入设备
     AVCaptureDevice *audioCaptureDevice = [AVCaptureDevice devicesWithMediaType:AVMediaTypeAudio].firstObject;
+    
+    
     // 4.根据输入设备初始化设备输入对象,用于获得输入数据
     NSError *error = nil;
     _captureDeviceInput = [AVCaptureDeviceInput deviceInputWithDevice:captureDevice error:&error];
@@ -130,6 +132,7 @@ typedef void(^PropertyChangeBlock)(AVCaptureDevice *captureDevice);
     // 初始化图片设备输出对象
     _captureStillImageOutput = [[AVCaptureStillImageOutput alloc] init];
     _captureStillImageOutput.outputSettings = @{AVVideoCodecKey: AVVideoCodecJPEG}; // 输出设置
+    
     // 6.将设备添加到会话中
     if ([_captureSession canAddInput:_captureDeviceInput]) {
         [_captureSession addInput:_captureDeviceInput];
@@ -146,6 +149,7 @@ typedef void(^PropertyChangeBlock)(AVCaptureDevice *captureDevice);
     if ([_captureSession canAddOutput:_captureStillImageOutput]) {
         [_captureSession addOutput:_captureStillImageOutput];
     }
+    
     // 8.创建视频预览层
     _captureVideoPreviewLayer = [[AVCaptureVideoPreviewLayer alloc] initWithSession:_captureSession];
     CALayer *layer = _viewContainer.layer;
@@ -182,7 +186,7 @@ typedef void(^PropertyChangeBlock)(AVCaptureDevice *captureDevice);
     }
 }
 
-#pragma mark - Timer 
+#pragma mark - Timer
 - (void)addOwnTimer {
     _timer = [NSTimer scheduledTimerWithTimeInterval:kTimeChangeDuration target:self selector:@selector(videoTimeChanged:) userInfo:nil repeats:YES];
     [_timer pauseTimer];
@@ -265,9 +269,13 @@ typedef void(^PropertyChangeBlock)(AVCaptureDevice *captureDevice);
     [self resetVideoRecordCanPreview:canPreview];
     
     AVAsset *asset = [AVAsset assetWithURL:outputFileURL];
+//    [self performWithAsset:asset];
     AVPlayerItem *playerItem = [AVPlayerItem playerItemWithAsset:asset];
     _player = [AVPlayer playerWithPlayerItem:playerItem];
     _playerLayer = [AVPlayerLayer playerLayerWithPlayer:_player];
+    
+    // 设置playerLayer的frame
+    _playerLayer.transform = CATransform3DMakeRotation(M_PI, 0, 1, 0);
     _playerLayer.frame = _viewContainer.bounds;
     _playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
     [_viewContainer.layer addSublayer:_playerLayer];
@@ -525,10 +533,128 @@ typedef void(^PropertyChangeBlock)(AVCaptureDevice *captureDevice);
 
 - (CGImageRef)handleImage:(UIImage *)image {
     UIGraphicsBeginImageContextWithOptions(self.view.size, NO, 1.0);
+    // 旋转矩阵
+    CGContextRef contextRef = UIGraphicsGetCurrentContext();
+    CGAffineTransform transform = CGAffineTransformIdentity;
+    transform = CGAffineTransformTranslate(transform, self.view.width, 0);
+    transform = CGAffineTransformScale(transform, -1, 1);
+    CGContextConcatCTM(contextRef, transform);
+    
     [image drawInRect:CGRectMake(0, 0, self.view.width, self.view.height)];
     CGImageRef imageRef = UIGraphicsGetImageFromCurrentImageContext().CGImage;
     CGImageRef subRef = CGImageCreateWithImageInRect(imageRef, CGRectOffset(_viewContainer.frame, 0, 88));
+    
     return subRef;
+}
+
+- (void)performWithAsset:(AVAsset *)asset {
+    // 1.音频、视频资源轨道
+    AVAssetTrack *assetVideoTrack = [asset tracksWithMediaType:AVMediaTypeVideo].firstObject;
+    AVAssetTrack *assetAudioTrack = [asset tracksWithMediaType:AVMediaTypeAudio].firstObject;
+    
+    // 2.创建视频组合对象
+    AVMutableComposition *compositionM = [AVMutableComposition composition];
+    
+    CMTimeRange timeRange = CMTimeRangeMake(kCMTimeZero, asset.duration);
+    CMTime startTime = kCMTimeZero;
+    
+    // 3.插入视频、音频轨道
+    if (assetVideoTrack) { // 插入视频
+        AVMutableCompositionTrack *trackM = [compositionM addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
+        NSError *error;
+        [trackM insertTimeRange:timeRange ofTrack:assetVideoTrack atTime:startTime error:&error];
+        NSLog(@"error = %@", error);
+    }
+    if (assetAudioTrack) { // 插入音频
+        AVMutableCompositionTrack *trackM = [compositionM addMutableTrackWithMediaType:AVMediaTypeAudio preferredTrackID:kCMPersistentTrackID_Invalid];
+        NSError *error;
+        [trackM insertTimeRange:timeRange ofTrack:assetAudioTrack atTime:startTime error:&error];
+        NSLog(@"error = %@", error);
+    }
+    
+    // 4.视频的平移、旋转矩阵
+    CGFloat h = assetVideoTrack.naturalSize.height;
+    CGFloat w = assetVideoTrack.naturalSize.width;
+    
+    CGAffineTransform t2 = CGAffineTransformIdentity;
+    // rotate M_PI_2
+    t2 = CGAffineTransformRotate(t2, M_PI_2);
+    t2 = CGAffineTransformTranslate(t2, 0, -h);
+    // mirrored
+    t2 = CGAffineTransformScale(t2, 1, -1);
+    t2 = CGAffineTransformTranslate(t2, 0, -h);
+    
+    NSLog(@"naturalSize = %@", NSStringFromCGSize(assetVideoTrack.naturalSize));
+    
+    
+    // 5.Set the appropriate render sizes and rotational transforms
+    // 5.1设置视频的宽高
+    AVMutableVideoComposition *videoCompositionM = [AVMutableVideoComposition videoComposition];
+    videoCompositionM.renderSize = CGSizeMake(h, w);
+    // 5.2设置视频的frame
+    videoCompositionM.frameDuration = CMTimeMake(1, 30);
+    // 5.3 The rotate transform is set on a layer instruction
+    AVMutableVideoCompositionInstruction * instruction = [AVMutableVideoCompositionInstruction videoCompositionInstruction];
+    instruction.timeRange = CMTimeRangeMake(kCMTimeZero, compositionM.duration);
+    // 5.4创建图层指令
+    AVMutableVideoCompositionLayerInstruction *layerInstruction = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstructionWithAssetTrack:compositionM.tracks.firstObject];
+    [layerInstruction setTransform:t2 atTime:kCMTimeZero];
+    
+    // 6.Add the transform instructions to the video composition
+    instruction.layerInstructions = @[layerInstruction];
+    videoCompositionM.instructions = @[instruction];
+    
+    // 7.Mix parameters sets a volume ramp for the audio track to be mixed with existing audio track for the duration of the composition
+    // 设置添加音频的时间段，并设置与原来视频中存在的音频进行混合
+    AVMutableAudioMixInputParameters *mixParameters = [AVMutableAudioMixInputParameters audioMixInputParametersWithTrack:assetAudioTrack];
+    AVMutableAudioMix *audioMixM = [AVMutableAudioMix audioMix];
+    audioMixM.inputParameters = @[mixParameters];
+    
+    // 8.导出视频
+    AVAssetExportSession *exportSession = [[AVAssetExportSession alloc] initWithAsset:compositionM.copy presetName:AVAssetExportPreset1280x720];
+    exportSession.videoComposition = videoCompositionM;
+    exportSession.audioMix = audioMixM;
+    exportSession.outputFileType = AVFileTypeQuickTimeMovie;
+    NSString *path = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject stringByAppendingPathComponent:@"yan.mp4"];
+    exportSession.outputURL = [NSURL fileURLWithPath:path];
+    
+    // 移除文件先
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    if ([fileManager fileExistsAtPath:path]) {
+        [fileManager removeItemAtPath:path error:NULL];
+    }
+    
+    // 8.1异步导出
+    [exportSession exportAsynchronouslyWithCompletionHandler:^{
+        switch (exportSession.status) {
+            case AVAssetExportSessionStatusCompleted:
+                [self playWithURL:path];
+                break;
+            case AVAssetExportSessionStatusFailed:
+                NSLog(@"failed error = %@", exportSession.error);
+                break;
+            case AVAssetExportSessionStatusCancelled:
+                NSLog(@"cancell error = %@", exportSession.error);
+                break;
+                
+            default:
+                break;
+        }
+    }];
+}
+
+- (void)playWithURL:(NSString *)urlPath {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        AVAsset *asset = [AVAsset assetWithURL:[NSURL fileURLWithPath:urlPath]];
+        AVPlayerItem *playerItem = [AVPlayerItem playerItemWithAsset:asset];
+        _player = [AVPlayer playerWithPlayerItem:playerItem];
+        _playerLayer = [AVPlayerLayer playerLayerWithPlayer:_player];
+        _playerLayer.frame = _viewContainer.bounds;
+        _playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
+        [_viewContainer.layer addSublayer:_playerLayer];
+        [_player play];
+        _completeView.hidden = NO;
+    });
 }
 
 
