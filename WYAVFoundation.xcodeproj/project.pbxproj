@@ -171,7 +171,7 @@
 				TargetAttributes = {
 					E3D7377C1C33BECE0043766A = {
 						CreatedOnToolsVersion = 7.2;
-						DevelopmentTeam = SX8PGCDPTD;
+						DevelopmentTeam = AWQVP37JFT;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -335,7 +335,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer: Luyi Zhou (Q4562SR374)";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
-				DEVELOPMENT_TEAM = SX8PGCDPTD;
+				DEVELOPMENT_TEAM = AWQVP37JFT;
 				INFOPLIST_FILE = WYAVFoundation/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
@@ -351,7 +351,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer: Luyi Zhou (Q4562SR374)";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
-				DEVELOPMENT_TEAM = SX8PGCDPTD;
+				DEVELOPMENT_TEAM = AWQVP37JFT;
 				INFOPLIST_FILE = WYAVFoundation/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";

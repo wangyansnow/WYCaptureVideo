@@ -22,7 +22,7 @@ typedef void(^PropertyChangeBlock)(AVCaptureDevice *captureDevice);
 #define kVideoTotalTime 30
 #define kVideoLimit 10
 
-@interface WYVideoCaptureController ()<AVCaptureFileOutputRecordingDelegate>
+@interface WYVideoCaptureController ()<AVCaptureFileOutputRecordingDelegate, AVCaptureMetadataOutputObjectsDelegate>
 {
     CGRect _leftBtnFrame;
     CGRect _centerBtnFrame;
@@ -54,6 +54,8 @@ typedef void(^PropertyChangeBlock)(AVCaptureDevice *captureDevice);
 @property (nonatomic, strong) UIButton *retakeBtn;
 @property (nonatomic, strong) UIButton *submitBtn;
 
+@property (nonatomic, strong) UIView *faceView;
+
 /// 负责输入和输出设备之间数据传递
 @property (nonatomic, strong) AVCaptureSession *captureSession;
 /// 负责从AVCaptureDevice获取数据
@@ -70,6 +72,7 @@ typedef void(^PropertyChangeBlock)(AVCaptureDevice *captureDevice);
 @property (nonatomic, assign) CGRect lastBounds;
 /// 后台任务标识
 @property (nonatomic, assign) UIBackgroundTaskIdentifier backgroundTaskIndentifier;
+
 
 @end
 
@@ -158,6 +161,34 @@ typedef void(^PropertyChangeBlock)(AVCaptureDevice *captureDevice);
     _captureVideoPreviewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
     [layer insertSublayer:_captureVideoPreviewLayer atIndex:0];
     [self addNotificationToCaptureDevice:captureDevice];
+    
+    // 10.实时人脸检测
+    AVCaptureMetadataOutput *metadataOutput = [[AVCaptureMetadataOutput alloc] init];
+    [metadataOutput setMetadataObjectsDelegate:self queue:dispatch_get_main_queue()];
+    if ([_captureSession canAddOutput:metadataOutput]) {
+        [_captureSession addOutput:metadataOutput];
+    }
+    metadataOutput.metadataObjectTypes = @[AVMetadataObjectTypeFace];
+}
+
+#pragma mark - AVCaptureMetadataOutputObjectsDelegate
+- (void)captureOutput:(AVCaptureOutput *)output didOutputMetadataObjects:(NSArray<__kindof AVMetadataObject *> *)metadataObjects fromConnection:(AVCaptureConnection *)connection {
+    
+    if (metadataObjects.count == 0) return;
+    AVMetadataObject *metadata = [_captureVideoPreviewLayer transformedMetadataObjectForMetadataObject:metadataObjects[0]];
+    NSLog(@"metadata.bounds = %@", NSStringFromCGRect(metadata.bounds));
+    self.faceView.frame = metadata.bounds;
+    
+}
+
+- (UIView *)faceView {
+    if (!_faceView) {
+        _faceView = [UIView new];
+        _faceView.layer.borderColor = [UIColor redColor].CGColor;
+        _faceView.layer.borderWidth = 1;
+        [_viewContainer addSubview:_faceView];
+    }
+    return _faceView;
 }
 
 #pragma mark - CaptureMethod

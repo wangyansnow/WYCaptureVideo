@@ -14,7 +14,7 @@
 typedef void(^PropertyChangeBlock)(AVCaptureDevice *captureDevice);
 #define kAnimationDuration 0.2
 
-@interface WYCaptureController ()
+@interface WYCaptureController () <AVCaptureMetadataOutputObjectsDelegate>
 {
     CGRect _leftBtnFrame;
     CGRect _centerBtnFrame;
@@ -115,6 +115,19 @@ typedef void(^PropertyChangeBlock)(AVCaptureDevice *captureDevice);
     // 9.
     [self addNotificationToCaptureDevice:captureDevice];
     [self addGestureRecognizer];
+    
+    // 10.实时人脸检测
+    AVCaptureMetadataOutput *metadataOutput = [[AVCaptureMetadataOutput alloc] init];
+    [metadataOutput setMetadataObjectsDelegate:self queue:dispatch_get_main_queue()];
+    if ([_captureSession canAddOutput:metadataOutput]) {
+        [_captureSession addOutput:metadataOutput];
+    }
+    metadataOutput.metadataObjectTypes = @[AVMetadataObjectTypeFace];
+}
+
+#pragma mark - AVCaptureMetadataObjectOutputDelegate
+- (void)captureOutput:(AVCaptureOutput *)output didOutputMetadataObjects:(NSArray<__kindof AVMetadataObject *> *)metadataObjects fromConnection:(AVCaptureConnection *)connection {
+    NSLog(@"metadataObjects = %@", metadataObjects);
 }
 
 #pragma mark - 通知
