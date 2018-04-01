@@ -176,7 +176,6 @@ typedef void(^PropertyChangeBlock)(AVCaptureDevice *captureDevice);
     
     if (metadataObjects.count == 0) return;
     AVMetadataObject *metadata = [_captureVideoPreviewLayer transformedMetadataObjectForMetadataObject:metadataObjects[0]];
-    NSLog(@"metadata.bounds = %@", NSStringFromCGRect(metadata.bounds));
     self.faceView.frame = metadata.bounds;
     
 }
@@ -512,6 +511,7 @@ typedef void(^PropertyChangeBlock)(AVCaptureDevice *captureDevice);
         return;
     }
     /// 视频
+    [[AVAudioSession sharedInstance] setActive:YES error:nil];
     // 1.根据设备输出获得连接
     AVCaptureConnection *captureConnection = [_captureMovieFileOutput connectionWithMediaType:AVMediaTypeVideo];
     // 2.根据连接取得设备输出的数据
@@ -532,7 +532,12 @@ typedef void(^PropertyChangeBlock)(AVCaptureDevice *captureDevice);
 }
 
 - (void)importBtnClick {
+    NSLog(@"%s", __func__);
     
+    [[AVAudioSession sharedInstance] setActive:NO error:nil];
+    
+    UIImpactFeedbackGenerator *feedback = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleHeavy];
+    [feedback impactOccurred];
 }
 
 #pragma mark - private
